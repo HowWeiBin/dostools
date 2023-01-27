@@ -1,0 +1,19 @@
+Metadata-Version: 2.1
+Name: dostools
+Version: 0.0.1
+Summary: Helpful Tools for building Machine Learning Models for Density of States (DOS)
+Home-page: https://github.com/HowWeiBin/DOSTools
+Author-email: How Wei Bin <weibin.how@epfl.ch>
+License: "LGPL-2.1-or-later"
+Project-URL: Homepage, https://github.com/HowWeiBin/DOSTools
+Project-URL: Bug Tracker, https://github.com/HowWeiBin/DOSTools/issues
+Keywords: DOS,Machine Learning,Density  of States
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# DOSTools
+
+DOSTools is a set of python scripts and notebooks designed to facillitate the building of machine learning models for the learning of Density of States (DOS). 

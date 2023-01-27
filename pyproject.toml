@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dostools"
+version = "0.0.1"
+authors = [
+  { name="How Wei Bin", email="weibin.how@epfl.ch" },
+]
+description = "Helpful Tools for building Machine Learning Models for Density of States (DOS)"
+readme = "README.md"
+requires-python = ">=3.7"
+
+
+[project.urls]
+"Homepage" = "https://github.com/HowWeiBin/DOSTools"
+"Bug Tracker" = "https://github.com/HowWeiBin/DOSTools/issues"
