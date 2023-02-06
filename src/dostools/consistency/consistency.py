@@ -107,7 +107,7 @@ def shifted_ldos(ldos, xdos, shift):
         if xdos_shift < 0:
             shifted_ldos = torch.nn.functional.pad(ldos[(-1*xdos_shift):], (0,(-1*xdos_shift)))
         else:
-            shifted_ldos[i] = ldos[i]
+            shifted_ldos = ldos
     return shifted_ldos
     
     
