@@ -1,3 +1,4 @@
 /src/dostools/datasets/data/
 /tests2/
 *.pt
+*.npy
