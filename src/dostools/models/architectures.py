@@ -63,7 +63,7 @@ class LinearModel(nn.Module):
                 scheduler_threshold = 1000
             tol = 1e-4
         if self.opt == "LBFGS":
-            opt = torch.optim.LBFGS(self.parameters(), lr = lr)
+            opt = torch.optim.LBFGS(self.parameters(), lr = lr, line_search_fn = "strong_wolfe")
             if valdata_loader is not None:
                 threshold = 2000
                 scheduler_threshold = 2000
@@ -71,7 +71,7 @@ class LinearModel(nn.Module):
                 threshold = 30
                 scheduler_threshold = 5
             tol = 1e-2
-        scheduler = torch.optim.lr_scheduler.StepLR(opt, scheduler_threshold, gamma = 0.1)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor = 0.1, patience = scheduler_threshold)#0.5)
         best_state = copy.deepcopy(self.state_dict())
         lowest_loss = torch.tensor(9999)
         pred_loss = torch.tensor(0)
@@ -141,13 +141,14 @@ class LinearModel(nn.Module):
                         loss_history.append(lowest_loss.item())
 
             with torch.no_grad():
+                scheduler.step(new_loss)
                 if valdata_loader is not None:
                     new_loss = torch.zeros(1, requires_grad = False).to(self.device)
                     for x_val, y_val in valdata_loader:
                         x_val, y_val = x_val.to(self.device), y_val.to(self.device)
                         val_pred = self.forward(x_val)
                         new_loss += loss(val_pred, y_val, self.xdos, perc = False)
-
+                
                 if lowest_loss - new_loss > tol: #threshold to stop training
                     best_state = copy.deepcopy(self.state_dict())
                     lowest_loss = new_loss
@@ -155,7 +156,7 @@ class LinearModel(nn.Module):
 
                 else:
                     trigger +=1
-                    scheduler.step()
+
                     if trigger > threshold:
                         self.load_state_dict(best_state)
                         print ("Implemented early stopping with lowest_loss: {}".format(lowest_loss))

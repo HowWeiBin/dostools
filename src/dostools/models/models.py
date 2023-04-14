@@ -24,14 +24,14 @@ class GPR:
 		for train_ratio in self.data_intervals:
 			n_train = int(train_ratio * len(train_index))
 			train_index = train_index[:n_train]
-			pred = self.feature @ self.weights[train_ratio]
+			pred = np.hstack([self.feature, np.ones(len(self.feature)).reshape(-1,1)]) @ self.weights[train_ratio]
 			self.DOSrmse[train_ratio] = evaluator.GetDosRMSE(pred, self.target_name, train_index, test_index)
 
 	def get_targetRMSE(self, evaluator, train_index, test_index):
 		for train_ratio in self.data_intervals:
 			n_train = int(train_ratio * len(train_index))
 			train_index = train_index[:n_train]
-			pred = self.feature @ self.weights[train_ratio]
+			pred = np.hstack([self.feature, np.ones(len(self.feature)).reshape(-1,1)]) @ self.weights[train_ratio]
 			self.targetrmse[train_ratio] = evaluator.GetTargetRMSE(pred, self.target_name, train_index, test_index)
 
 class RidgeRegression:
@@ -44,21 +44,21 @@ class RidgeRegression:
 		self.x_dos = x_dos
 		self.DOSrmse = {}
 		self.targetrmse = {}
-
 	def obtain_weights(self, data_intervals, train_index):
 		self.data_intervals = data_intervals
 		for train_ratio in data_intervals:
-			self.models[train_ratio] = training.train_analytical_model_ridge(self.feature, self.feature_name, self.target, self.target_name, self.x_dos,
-				train_index, train_ratio, 2)
+			self.models[train_ratio] = training.train_analytical_model_ridge(self.feature, self.feature_name, self.target, self.target_name, self.x_dos, train_index, train_ratio, 2)
 
 	def get_DosRMSE(self, evaluator, train_index, test_index):
 		for train_ratio in self.data_intervals:
-			pred = self.models[train_ratio].predict(self.feature.detach().numpy())
+			feature = torch.hstack([self.feature, torch.ones(len(self.feature)).view(-1,1)])
+			pred = feature @ self.models[train_ratio]
 			self.DOSrmse[train_ratio] = evaluator.GetDosRMSE(pred, self.target_name, train_index, test_index)
 
 	def get_targetRMSE(self, evaluator, train_index, test_index):
 		for train_ratio in self.data_intervals:
-			pred = self.models[train_ratio].predict(self.feature.detach().numpy())
+			feature = torch.hstack([self.feature, torch.ones(len(self.feature)).view(-1,1)])
+			pred = feature @ self.models[train_ratio]
 			self.targetrmse[train_ratio] = evaluator.GetTargetRMSE(pred, self.target_name, train_index, test_index)	
 
 class TRegression: 
@@ -77,7 +77,6 @@ class TRegression:
 		self.val = False
 
 	def obtain_weights(self, data_intervals, train_index, reg, lr, n_epochs, loss):
-
 		if reg is None:
 			reg = training.torch_linear_optimize_hypers(self.feature, self.feature_name, self.target, self.target_name, self.datatype, self.opt, lr, n_epochs, self.device, 2, self.x_dos, train_index, loss, self.val)
 		self.data_intervals = data_intervals

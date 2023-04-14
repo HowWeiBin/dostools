@@ -17,9 +17,11 @@ log_grid = np.log(grid)
 maxiter = 2
 
 gpr_loss = utils.get_rmse
-ridge_loss = utils.get_rmse
+#ridge_loss = utils.get_rmse
 torch.set_default_dtype(torch.float64) 
-#ridge_loss = loss.t_get_rmse
+ridge_loss = loss.t_get_rmse
+
+test = torch.linalg.lstsq(torch.ones(30,30).T @ torch.ones(30,30) + 3* torch.eye(30), torch.ones(30,30).T @ torch.zeros(30,30), driver = 'gelsd').solution
 
 def train_analytical_model_GPR(Feature: torch.tensor, feature_name: str, target: torch.tensor, target_name: str, x_dos: torch.tensor, kMM: np.array, train_index: np.array, train_ratio:int, cv: int = 2):
     """
@@ -42,6 +44,7 @@ def train_analytical_model_GPR(Feature: torch.tensor, feature_name: str, target:
     n_train = int(train_ratio * len(train_index))
     train_index = train_index[:n_train]
     errors = np.zeros(len(log_grid))
+
     for i, value in enumerate(log_grid):
         errors[i] = GPR_k_fold_error(value, target, Feature.detach().numpy(), kMM, cv, train_index, xdos = x_dos.detach().numpy())
     reg_init = np.exp(log_grid[errors.argmin()])
@@ -85,14 +88,21 @@ def GPR_k_fold_error(i_regularization: np.array, target: torch.tensor, kNM: torc
                                    kMM=kMM, 
                                    regularization=regularization, 
                                    kNM=kNM[train_idx[train]])
-        target_pred = kNM @ w
+        target_pred = np.hstack([kNM, np.ones(len(kNM)).reshape(-1,1)]) @ w
         temp_err += gpr_loss(target_pred[train_idx[test]], target[train_idx[test]].numpy())#, xdos, perc=True)
     print ("The performance at reg value {} is {}".format(regularization, temp_err/cv))
     return temp_err/cv
 
+def get_analytical_weights(feature, target, regularization):
+    n_col = feature.shape[1]
+    reg = regularization * torch.eye(n_col)
+    reg[n_col-1,n_col-1] = 0
+    weights = torch.linalg.lstsq(feature.T @ feature + reg, feature.T @ target, driver = 'gelsd').solution
+    return weights
+    
 def train_analytical_model_ridge(Feature: torch.tensor, feature_name: str, target: torch.tensor, target_name: str, x_dos: torch.tensor, train_index: np.array, train_ratio:int, cv: int = 2):
     """
-    Finds optimal regularization value and returns optimal regression weights
+    Finds optimal regularization value and returns optimal regression weights, with bias
     
     Args:
         Feature (torch.tensor): Kernel Tensor
@@ -105,13 +115,15 @@ def train_analytical_model_ridge(Feature: torch.tensor, feature_name: str, targe
         cv (int, optional): cross validation paramters
     
     Returns:
-        model: sklearn model using the optimal regularization value
+        model_weights: model weights corresponding to the optimal regularization value
     
     
     """
     n_train = int(train_ratio * len(train_index))
     train_index = train_index[:n_train]
     errors = np.zeros(len(log_grid))
+    Feature = torch.hstack([Feature, torch.ones(len(Feature)).view(-1,1)])
+    target = target
     for i, value in enumerate(log_grid):
         errors[i] = k_fold_Ridgeregression(value, target, Feature, cv, x_dos, train_index)
     reg_init = np.exp(log_grid[errors.argmin()])
@@ -121,10 +133,9 @@ def train_analytical_model_ridge(Feature: torch.tensor, feature_name: str, targe
     rmin = minimize(k_fold_Ridgeregression, [np.log(reg_init)], args = (target, Feature, cv, x_dos, train_index), method = "Nelder-Mead", options = {"maxiter" : maxiter})
     opt_reg = np.exp(rmin["x"])[0]
     print ("Optimal regularization value for Ridge, Feature:{}, target: {}, train_ratio: {} is {}".format(feature_name, target_name, train_ratio, opt_reg))
-    model = Ridge(alpha = opt_reg, fit_intercept = False, solver = 'svd')
-    model.fit(Feature[train_index], target[train_index])
+    model_weights = get_analytical_weights(Feature[train_index], target[train_index], opt_reg)
     
-    return model        
+    return model_weights
 
 
 def k_fold_Ridgeregression(reg: np.array, target: torch.tensor, Features: torch.tensor, cv: int, xdos: torch.tensor, train_index: np.array):
@@ -142,13 +153,14 @@ def k_fold_Ridgeregression(reg: np.array, target: torch.tensor, Features: torch.
         TYPE: Description
     """
     reg = np.exp(reg).item()
-    model = Ridge(alpha = reg, fit_intercept = False, solver = 'svd')
+#     weights = get_analytical_weights
+#     model = Ridge(alpha = reg, fit_intercept = False, solver = 'svd')
     kfold = KFold(n_splits = cv, shuffle=False)
     err = 0
     for train, test in kfold.split(train_index):
-        model.fit(Features[train_index[train]], target[train_index[train]])
-        pred = model.predict(Features[train_index[test]])
-        err += ridge_loss(pred, target[train_index[test]].detach().numpy())#, xdos, perc = True)
+        weights = get_analytical_weights(Features[train_index[train]], target[train_index[train]], reg)
+        pred = Features[train_index[test]] @ weights
+        err += ridge_loss(pred, target[train_index[test]])#, xdos, perc = True)
     print ("The performance at reg value {} is {}".format(reg, err/cv))
     return err / cv
 

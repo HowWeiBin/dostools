@@ -169,13 +169,19 @@ def get_regression_weights(train_target, regularization=1e-3, kMM=[], kNM=[], ji
     KMM = kMM.copy()
     KMM[np.diag_indices_from(KMM)] += jitter
     
+    
     nref = len(kMM)
     delta = np.var(train_target) / kMM.trace() / nref
     
     KNM /= regularization / delta
     Y /= regularization / delta
     
-    K = kMM + KNM.T @ KNM
+    KNM = np.hstack([ KNM, np.ones(len(KNM)).reshape(-1,1)])
+    z = np.empty((nref + 1, nref + 1))
+    z[:nref,:nref] = KMM
+    
+    
+    K = z + KNM.T @ KNM
     Y = KNM.T @ Y
     
     weights = np.linalg.lstsq(K, Y, rcond=1e-10)[0]#None)[0]

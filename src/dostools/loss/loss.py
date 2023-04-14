@@ -6,15 +6,21 @@ import tqdm.notebook as tq
 
 def t_get_mse(a, b, xdos = None, perc = False):
     if xdos is not None:
-        mse = (torch.trapezoid((a - b)**2, xdos, axis=1)).mean()
+        if len(a.size()) > 1:
+            mse = (torch.trapezoid((a - b)**2, xdos, axis=1)).mean()
+        else:
+            mse = (torch.trapezoid((a - b)**2, xdos, axis=0)).mean()
         if not perc:
             return mse
         else:
             mean = b.mean(axis = 0)
-            std = torch.sqrt(torch.trapezoid((b - mean)**2, xdos, axis=1)).mean()
+            std = torch.trapezoid((b - mean)**2, xdos, axis=1).mean()
             return (100 * mse / std)
     else:
-        mse = ((a - b)**2).mean(dim = 1)
+        if len(a.size()) > 1:
+            mse = ((a - b)**2).mean(dim = 1)
+        else:
+            mse = ((a - b)**2).mean()
         if len(mse.shape) > 1:
             raise ValueError('Loss became 2D')
         if not perc:
@@ -28,15 +34,21 @@ def t_get_rmse(a, b, xdos=None, perc=False): #account for the fact that DOS is c
          a=pred, b=target, xdos, perc: if False return RMSE else return %RMSE"""
     #MIGHT NOT WORK FOR PC
     if xdos is not None:
-        rmse = torch.sqrt(torch.trapezoid((a - b)**2, xdos, axis=1)).mean()
+        if len(a.size()) > 1:
+            rmse = torch.sqrt((torch.trapezoid((a - b)**2, xdos, axis=1)).mean())
+        else:
+            rmse = torch.sqrt((torch.trapezoid((a - b)**2, xdos, axis=0)).mean())
         if not perc:
             return rmse
         else:
             mean = b.mean(axis = 0)
-            std = torch.sqrt(torch.trapezoid((b - mean)**2, xdos, axis=1)).mean()
+            std = torch.sqrt((torch.trapezoid((b - mean)**2, xdos, axis=1)).mean())
             return (100 * rmse / std)
     else:
-        rmse = torch.sqrt(((a - b)**2).mean(dim =0))
+        if len(a.size()) > 1:
+            rmse = torch.sqrt(((a - b)**2).mean(dim =0))
+        else:
+            rmse = torch.sqrt(((a - b)**2).mean())
         if not perc:
             return torch.mean(rmse, 0)
         else:
@@ -51,6 +63,31 @@ def t_get_shifting_rmse(prediction, true, shift, xdos = None, perc = False):
     
     return loss
 
+def t_get_BF_shift_index_mse(prediction, true, shift_range, xdos = None, perc = False):
+    
+    if xdos is not None:
+        if len(prediction.shape) > 1:
+            mse = torch.zeros(true.shape[0])
+            index = torch.zeros(true.shape[0])
+            for i, pred in enumerate((prediction)):
+                shifted_preds = consistency.shifted_ldos(pred.repeat(shift_range.shape[0],1), xdos, shift_range)
+                mse[i], index[i] = torch.min(t_get_each_mse(shifted_preds, true[i].repeat(shift_range.shape[0],1)),0)
+            mse = torch.mean(mse, 0)
+
+                   
+        else: 
+            mse = torch.zeros(1)
+            index = torch.zeros(1)
+            shifted_preds = consistency.shifted_ldos(prediction.repeat(shift_range.shape[0],1), xdos, shift_range)
+            mse, index = torch.min(t_get_each_mse(shifted_preds, true.repeat(shift_range.shape[0],1)),0)
+            
+        return mse,index 
+    
+    else:
+        raise ValueError("xdos not defined")
+
+
+
 def t_get_BF_shift_rmse(prediction, true, shift_range, xdos = None, perc = False):
     if xdos is not None:
         loss = torch.zeros(true.shape[0])
@@ -58,8 +95,10 @@ def t_get_BF_shift_rmse(prediction, true, shift_range, xdos = None, perc = False
         std = torch.sqrt(torch.trapezoid((true - mean)**2, xdos, axis=1).mean())
         for i, pred in enumerate(prediction):
             shifted_preds = consistency.shifted_ldos(pred.repeat(shift_range.shape[0],1), xdos, shift_range) 
-            loss[i] = torch.min(t_get_each_rmse(shifted_preds, true[i].repeat(shift_range.shape[0],1), xdos = xdos, perc = perc, std_dev = std))
-        loss = torch.mean(loss, 0)
+            loss[i] = torch.min(t_get_each_mse(shifted_preds, true[i].repeat(shift_range.shape[0],1), xdos = xdos, perc = False))
+        loss = torch.sqrt(torch.mean(loss, 0))
+        if perc:
+            loss = 100 * loss / std
     else:
         loss = t_get_rmse(prediction, true, xdos, perc = perc)
     
@@ -70,11 +109,13 @@ def t_get_BF_shift_index_error(prediction, true, shift_range, xdos = None, perc 
         loss = torch.zeros(true.shape[0])
         index = torch.zeros(true.shape[0])
         mean = true.mean(axis = 0)
-        std = torch.sqrt(torch.trapezoid((true - mean)**2, xdos, axis=1))
+        std = torch.sqrt(torch.trapezoid((true - mean)**2, xdos, axis=1).mean())
         for i, pred in enumerate((prediction)):
             shifted_preds = consistency.shifted_ldos(pred.repeat(shift_range.shape[0],1), xdos, shift_range) 
-            loss[i], index[i] = torch.min(t_get_each_rmse(shifted_preds, true[i].repeat(shift_range.shape[0],1), xdos = xdos, perc = perc, std_dev = std[i]),0)
-        loss = torch.mean(loss, 0)
+            loss[i], index[i] = torch.min(t_get_each_mse(shifted_preds, true[i].repeat(shift_range.shape[0],1), xdos = xdos, perc = False),0)
+        loss = torch.sqrt(torch.mean(loss, 0))
+        if perc:
+            loss = 100 * loss / std
     else:
         loss = t_get_rmse(prediction, true, xdos, perc = perc)
     
@@ -291,11 +332,11 @@ def t_get_each_mse(prediction_array, true, xdos = None, perc = False, std_dev = 
         if not perc:
             return mse
         else:
-            return 100 * rmse / std_dev
+            return 100 * mse / std_dev
             
     else:
         mse = ((prediction_array - true)**2).mean(dim = 1)
         if not perc: 
             return mse
         else:
-            return (100 * (rmse / true.std(dim = 0,unbiased=True)))
+            return (100 * (mse / true.std(dim = 0,unbiased=True)))

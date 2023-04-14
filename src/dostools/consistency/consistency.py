@@ -77,7 +77,7 @@ def PotentialConsistency(ldos_tensor, xdos, structure, max_runs, threshold, step
     print ("Charges did not converge")
     return ldos, q, v, shift
 
-def get_potential(atom_index, charges, structure, inv_distance_matrix, QMPotential = None):
+def get_potential(atom_index, charges, structure, inv_distance_3matrix, QMPotential = None):
     #get pairwise distance
     #calculate potential
     if QMPotential:
@@ -104,7 +104,7 @@ def shifted_ldos(ldos, xdos, shift):
         xdos_shift = int(torch.round(shift/xdos_step))
         if xdos_shift > 0:
             shifted_ldos = torch.nn.functional.pad(ldos[:-1*xdos_shift], (xdos_shift,0))
-        if xdos_shift < 0:
+        elif xdos_shift < 0:
             shifted_ldos = torch.nn.functional.pad(ldos[(-1*xdos_shift):], (0,(-1*xdos_shift)))
         else:
             shifted_ldos = ldos
