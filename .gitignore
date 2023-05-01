@@ -1,2 +1,9 @@
 /src/dostools/datasets/data/
 /tests2/
+*.npy
+*.pt
+*.json
+*.xyz
+/tests/scripts/
+*.registry
+Splines_*

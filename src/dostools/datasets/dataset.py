@@ -27,8 +27,8 @@ class TensorFeatures:
         
         self.extract_dataset(descriptors)
     
-    def extract_dataset(self, descriptors):
-        n_refs = 500
+    def extract_dataset(self, descriptors, n_refs = 200):
+        n_refs = n_refs
         n_atoms = descriptors.block(0).values.shape[0]
         n_structures = np.unique(descriptors.block(0).samples["structure"])
         self.Features = {}
@@ -38,17 +38,17 @@ class TensorFeatures:
         self.Features["structure_avekerneldescriptors"] = torch.zeros(len(n_structures), n_refs)
         self.Features["structure_descriptors"] = []
         self.Features["structure_kerneldescriptors"] = []
-        self.Features["atom_descriptors"] = torch.tensor(descriptors.block(0).values)
-        self.Features['atom_descriptors'] = torch.nn.functional.normalize(self.Features["atom_descriptors"], dim = 1)
+        atom_descriptors = torch.tensor(descriptors.block(0).values)
+        atom_descriptors = torch.nn.functional.normalize(atom_descriptors, dim = 1)
         selector = FPS(n_to_select = n_refs,
                progress_bar = True,
                score_threshold = 1e-12,
                full = False,
                initialize = 0
               )
-        selector.fit(self.Features['atom_descriptors'].T)
-        references = selector.transform(self.Features['atom_descriptors'].T).T
-        self.Features['atomkernel_descriptors'] = torch.pow(self.Features['atom_descriptors'] @ references.T, 2) #25k, 1000
+        selector.fit(atom_descriptors.T)
+        references = selector.transform(atom_descriptors.T).T
+        atomkernel_descriptors = torch.pow(atom_descriptors @ references.T, 2) #25k, 1000
         #self.atomkernel_descriptors = torch.nn.functional.normalize(self.atomkernel_descriptors, dim = 1)
         #Computing sum_structure
         for structure_i in n_structures:
@@ -56,9 +56,9 @@ class TensorFeatures:
             self.Features["structure_sumdescriptors"][structure_i, :] = torch.tensor(np.sum(descriptors.block(0).values[a_i, :], axis = 0))
             self.Features["structure_avedescriptors"][structure_i, :] = torch.tensor(np.sum(descriptors.block(0).values[a_i, :], axis = 0))/np.sum(a_i)
             self.Features["structure_descriptors"].append(torch.tensor(descriptors.block(0).values[a_i,:]).float())
-            self.Features["structure_sumkerneldescriptors"][structure_i, :] = torch.sum(self.Features["atomkernel_descriptors"][a_i, :], axis = 0)
-            self.Features["structure_avekerneldescriptors"][structure_i, :] = torch.sum(self.Features["atomkernel_descriptors"][a_i, :], axis = 0)/np.sum(a_i)
-            self.Features["structure_kerneldescriptors"].append(self.Features["atomkernel_descriptors"][a_i,:])
+            self.Features["structure_sumkerneldescriptors"][structure_i, :] = torch.sum(atomkernel_descriptors[a_i, :], axis = 0)
+            self.Features["structure_avekerneldescriptors"][structure_i, :] = torch.sum(atomkernel_descriptors[a_i, :], axis = 0)/np.sum(a_i)
+            self.Features["structure_kerneldescriptors"].append(atomkernel_descriptors[a_i,:])
 
 class TorchDataset(Dataset):
     def __init__(self, X, y):

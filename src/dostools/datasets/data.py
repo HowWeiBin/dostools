@@ -5,6 +5,7 @@ import ase
 import ase.io as ase_io
 import sys
 from . import dataset
+import torch 
 
 
 
@@ -17,6 +18,9 @@ xdos_fileloc = data_path.joinpath("xdos.npy")
 ldos_fileloc = data_path.joinpath("ldos.npy")
 kMM_fileloc = data_path.joinpath("kMM.npy")
 features_fileloc = data_path.joinpath("Silicon_Features.pickle")
+s_coeff_fileloc = data_path.joinpath("structure_coefficients.pt")
+s_eigvals_fileloc = data_path.joinpath("structure_eigvals.pt")
+reconstructed_ldos_fileloc = data_path.joinpath("reconstructed_ldos.pt")
 
 def load_eigenenergies(unpack: bool, n_structures: int = None):
 	"""
@@ -53,7 +57,7 @@ def load_eigenenergies(unpack: bool, n_structures: int = None):
 		emin = np.min(np.array([np.min(eigenenergies[i]) for i in range(len(eigenenergies))]))
 		emax = np.max(np.array([np.max(eigenenergies[i]) for i in range(len(eigenenergies))]))
 
-	return eigen_energies, emin, emax
+	return eigenenergies, emin, emax
 
 def load_structures(index: str):
 	"""
@@ -109,3 +113,10 @@ def load_features():
     with open(features_fileloc,'rb') as file:
         features = pickle.load(file)
     return features
+
+def load_structure_gaussians():
+    eigvals = torch.load(s_eigvals_fileloc)
+    coeffs = torch.load(s_coeff_fileloc)
+    reconstructed = torch.load(reconstructed_ldos_fileloc)
+    
+    return eigvals, coeffs, reconstructed
