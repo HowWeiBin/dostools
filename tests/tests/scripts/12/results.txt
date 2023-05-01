@@ -1,0 +1,1 @@
+The train error is 52.334160641680114The test error is 60.93520049103151
